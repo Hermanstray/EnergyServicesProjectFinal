@@ -9,7 +9,7 @@ from sklearn import  metrics
 import numpy as np
 
 #Define CSS style
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+external_stylesheets = ['https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/slate/bootstrap.min.css']
 
 #Display raw data weather data
 df = pd.read_csv('SN69100_2015-2019_daily.csv')
@@ -31,10 +31,22 @@ X2=df.values
 df_real = pd.read_csv('Norway_Power_2020_daily.csv')
 y2=df_real['power_MW'].values
 
-#Load RF model
-with open('RF_model_final_prosj_v2.pkl','rb') as file:
-    RF_model2=pickle.load(file)
+#Load and run LR model
+with open('LR_model_final_prosj.pkl','rb') as file:
+    LR_model2=pickle.load(file)
+y2_pred_LR = LR_model2.predict(X2)
 
+#Evaluate errors
+MAE_LR=metrics.mean_absolute_error(y2,y2_pred_LR) 
+MBE_LR=np.mean(y2-y2_pred_LR)
+MSE_LR=metrics.mean_squared_error(y2,y2_pred_LR)  
+RMSE_LR= np.sqrt(metrics.mean_squared_error(y2,y2_pred_LR))
+cvRMSE_LR=RMSE_LR/np.mean(y2)
+NMBE_LR=MBE_LR/np.mean(y2)
+
+#Load RF model
+with open('RF_model_final_prosj.pkl','rb') as file:
+    RF_model2=pickle.load(file)
 y2_pred_RF = RF_model2.predict(X2)
 
 #Evaluate errors
@@ -46,9 +58,9 @@ cvRMSE_RF=RMSE_RF/np.mean(y2)
 NMBE_RF=MBE_RF/np.mean(y2)
 
 # Create data frames with predictin results and error metrics 
-d = {'Methods': ['Random Forest'], 'MAE': [MAE_RF],'MBE': [MBE_RF], 'MSE': [MSE_RF], 'RMSE': [RMSE_RF],'cvMSE': [cvRMSE_RF],'NMBE': [NMBE_RF]}
+d = {'Methods': ['Linear Regression','Random Forest'], 'MAE': [MAE_LR, MAE_RF],'MBE': [MBE_LR, MBE_RF], 'MSE': [MSE_LR, MSE_RF], 'RMSE': [RMSE_LR, RMSE_RF],'cvMSE': [cvRMSE_LR, cvRMSE_RF],'NMBE': [NMBE_LR, NMBE_RF]}
 df_metrics = pd.DataFrame(data=d)
-d={'date':df_real['date'].values, 'RandomForest': y2_pred_RF}
+d={'date':df_real['date'].values, 'LinearRegression': y2_pred_LR,'RandomForest': y2_pred_RF}
 df_forecast=pd.DataFrame(data=d)
 
 # merge real and forecast results and creates a figure with it
@@ -69,30 +81,39 @@ def generate_table(dataframe, max_rows=10):
         ])
     ])
 
-
+# Define app layout
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-server = app.server
 
-app.layout = html.Div([
-    html.H1('Norway Energy Consumtion (MWh)'),
-    html.P('Using data from 2015-2019 to forecast energy consumtion in Norway for 2020.'),
-    dcc.Tabs(id='tabs', value='tab-1', children=[
-        dcc.Tab(label='Raw Data', value='tab-1'),
-        dcc.Tab(label='Forecast', value='tab-2'),
-        dcc.Tab(label='Error Metrics', value='tab-3'),
-    ]),
-    html.Div(id='tabs-content')
+app.layout = html.Div(style={
+    'background-image': 'url("/assets/background.jpg")',
+    'background-size': 'cover',
+    'background-repeat': 'no-repeat',
+    'background-position': 'center center',
+    'background-attachment': 'fixed',
+    'min-height': '100vh',  # This ensures that the background covers the entire height of the view
+    'width': '100%'
+}, children=[
+    html.Div([
+        html.H1('Power Consumption in Norway', className='display-4 text-center mt-4 mb-4', style={'color': 'white'}),
+        html.P('Welcome! This dashboard provides a forecast of daily power consumption in Norway based on weather data. Navigate through the tabs to explore the raw data and forecasted results. The "Raw data" tab displays historical temperature, humidity, and Power usage from 2015 to 2020, while the "Forecast" tab shows the forecasted energy consumption using machine learning models.', 
+               className='lead text-center', style={'color': 'white', 'font-size': '20px'}),
+    ], className='container', style={'text-shadow': '2px 2px 4px #000000'}),  # text-shadow to improve text visibility
+    html.Div([
+        dcc.Tabs(id='tabs', value='tab-1', children=[
+            dcc.Tab(label='Raw data', value='tab-1', className='custom-tab'),
+            dcc.Tab(label='Power consumption forecast', value='tab-2', className='custom-tab'),
+        ], className='nav nav-pills nav-fill flex-column flex-md-row'),
+    ], className='container'),
+    html.Div(id='tabs-content', className='container')
 ])
-
-@app.callback(Output('tabs-content', 'children'),
-              Input('tabs', 'value'))
-
+# Define callback to update content based on selected tab
+@app.callback(Output('tabs-content', 'children'), [Input('tabs', 'value')])
 def render_content(tab):
     if tab == 'tab-1':
         return html.Div([
-            html.H4('Raw weather and power data 2015-2019'),
+            html.H4('', className='text-center mb-4 text-light'),
             dcc.Graph(
-                id='wather-data',
+                id='weather-data',
                 figure=fig1,
             ),
             dcc.Graph(
@@ -102,19 +123,20 @@ def render_content(tab):
         ])
     elif tab == 'tab-2':
         return html.Div([
-            html.H4('Predict Power 01.01.2020 to 31.07.2020 (MWh)'),
+            html.H4('', className='text-center mb-4 text-light'),
             dcc.Graph(
-                id='predict-data',
-                figure=fig3,
-                ),
-            
+                id='forecast-data',
+                figure = fig3,
+            ),
+            html.Hr(),
+            html.H4('Error Metrics', className='text-center mb-4 text-light'),
+            html.Div([
+                html.Table(
+                    [html.Tr([html.Th(col) for col in df_metrics.columns])] +
+                    [html.Tr([html.Td(df_metrics.iloc[i][col]) for col in df_metrics.columns]) for i in range(len(df_metrics))]
+                )
+            ], className='table table-striped table-hover text-dark', style={'background-color': 'white'})
         ])
-    elif tab == 'tab-3':
-        return html.Div([
-            html.H4('Error Metrics for Forecast 2020'),
-                        generate_table(df_metrics)
-        ])
-
 
 if __name__ == '__main__':
-    app.run_server()
+    app.run_server(debug=True)
