@@ -83,6 +83,7 @@ def generate_table(dataframe, max_rows=10):
 
 # Define app layout
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+server=app.server
 
 app.layout = html.Div(style={
     'background-image': 'url("/assets/background.jpg")',
@@ -139,4 +140,4 @@ def render_content(tab):
         ])
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server()
