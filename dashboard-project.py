@@ -32,7 +32,7 @@ df_real = pd.read_csv('Norway_Power_2020_daily.csv')
 y2=df_real['power_MW'].values
 
 #Load RF model
-with open('RF_model_final_prosj.pkl','rb') as file:
+with open('RF_model_final_prosj_v2.pkl','rb') as file:
     RF_model2=pickle.load(file)
 
 y2_pred_RF = RF_model2.predict(X2)
